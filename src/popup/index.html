@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Retail Agent</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+  <div id="app">
+    <div id="header">
+      <h1>Retail Agent</h1>
+      <button id="settings-btn">⚙️</button>
+    </div>
+
+    <div id="chat-container">
+      <div id="messages">
+        <div class="message system">
+          Hi! I can help you buy things on Amazon using your Gemni API Key. Try "Buy Samsung phone..."
+        </div>
+      </div>
+    </div>
+
+    <div id="input-area">
+      <input type="text" id="user-input" placeholder="Type your request...">
+      <button id="send-btn">Send</button>
+    </div>
+
+    <div id="settings-modal" class="hidden">
+      <div class="modal-content">
+        <h2>Settings</h2>
+        <label for="api-key">Gemini API Key:</label>
+        <input type="password" id="api-key" placeholder="Enter API Key">
+        <button id="save-settings">Save</button>
+        <button id="check-models">Check Models</button>
+        <button id="close-settings">Close</button>
+      </div>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+
+</html>
