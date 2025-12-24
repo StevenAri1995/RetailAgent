@@ -39,6 +39,7 @@
     <div id="settings-modal" class="hidden" role="dialog" aria-labelledby="settings-title" aria-modal="true">
       <div class="modal-content">
         <h2 id="settings-title">Settings</h2>
+        
         <label for="api-key">Gemini API Key:</label>
         <input 
           type="password" 
@@ -46,6 +47,38 @@
           placeholder="Enter API Key"
           aria-label="Gemini API Key"
           aria-required="true">
+        
+        <label for="phone-number">Phone Number (for OTP login):</label>
+        <input 
+          type="tel" 
+          id="phone-number" 
+          placeholder="+91 1234567890"
+          aria-label="Phone Number"
+          aria-required="false">
+        
+        <div class="platform-login-section">
+          <label>Platform Login Status:</label>
+          <div class="platform-checkboxes">
+            <label class="platform-checkbox">
+              <input type="checkbox" id="amazon-login" data-platform="amazon">
+              <span>Amazon</span>
+            </label>
+            <label class="platform-checkbox">
+              <input type="checkbox" id="flipkart-login" data-platform="flipkart">
+              <span>Flipkart</span>
+            </label>
+            <label class="platform-checkbox">
+              <input type="checkbox" id="ebay-login" data-platform="ebay">
+              <span>eBay</span>
+            </label>
+            <label class="platform-checkbox">
+              <input type="checkbox" id="walmart-login" data-platform="walmart">
+              <span>Walmart</span>
+            </label>
+          </div>
+          <button id="login-platforms-btn" class="secondary-btn">Login to Selected Platforms</button>
+        </div>
+        
         <div class="button-group">
           <button id="save-settings" aria-label="Save settings">Save</button>
           <button id="check-models" aria-label="Check available models">Check Models</button>
@@ -54,6 +87,7 @@
         </div>
       </div>
     </div>
+
   </div>
   <script src="popup.js"></script>
 </body>

@@ -91,7 +91,7 @@
     },
     "web_accessible_resources": [
         {
-            "resources": ["docs/privacy-policy.html"],
+            "resources": ["docs/privacy-policy.html", "src/content/shared/login-handlers.js"],
             "matches": ["<all_urls>"]
         }
     ],

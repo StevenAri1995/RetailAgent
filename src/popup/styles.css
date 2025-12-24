@@ -290,3 +290,73 @@ body {
   padding: 40px 20px;
   font-style: italic;
 }
+
+/* Platform login section */
+.platform-login-section {
+  margin: 20px 0;
+  padding: 15px;
+  background: #f9f9f9;
+  border-radius: 8px;
+}
+
+.platform-login-section label {
+  display: block;
+  margin-bottom: 10px;
+  font-weight: 500;
+  color: #333;
+}
+
+.platform-checkboxes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 15px;
+}
+
+.platform-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.platform-checkbox:hover {
+  background: #f0f0f0;
+}
+
+.platform-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.platform-checkbox span {
+  font-size: 14px;
+  color: #333;
+}
+
+.secondary-btn {
+  padding: 10px 20px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  width: 100%;
+  transition: background 0.2s;
+}
+
+.secondary-btn:hover {
+  background: #5568d3;
+}
+
+.secondary-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+

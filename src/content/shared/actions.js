@@ -50,30 +50,92 @@ export async function performSearch(searchQuery, searchSelectors, options = {}) 
  */
 export function extractProducts(containerSelector, productSelectors) {
     const products = [];
-    const containers = document.querySelectorAll(containerSelector);
+    
+    // Handle array of selectors
+    const containerSelectors = Array.isArray(containerSelector) ? containerSelector : [containerSelector];
+    let containers = [];
+    
+    for (const selector of containerSelectors) {
+        try {
+            const found = document.querySelectorAll(selector);
+            if (found.length > 0) {
+                containers = Array.from(found);
+                logger.debug(`Found ${containers.length} containers with selector: ${selector}`);
+                break;
+            }
+        } catch (e) {
+            logger.warn(`Selector failed: ${selector}`, { error: e.message });
+            continue;
+        }
+    }
+    
+    if (containers.length === 0) {
+        logger.warn('No containers found with any selector', { selectors: containerSelectors });
+        return products;
+    }
 
     containers.forEach((container, index) => {
         try {
             // Get link element - try multiple approaches
-            let linkElement = container.querySelector(productSelectors.link);
-            if (!linkElement && typeof productSelectors.link === 'string') {
-                // Try finding link within container - Amazon product links
-                linkElement = container.querySelector(`a[href*="/dp/"], a[href*="/gp/product/"], a[href*="/product/"]`);
-            }
-            // If still not found, try any link in h2
-            if (!linkElement) {
-                linkElement = container.querySelector('h2 a, h3 a');
+            const linkSelectors = Array.isArray(productSelectors.link) 
+                ? productSelectors.link 
+                : [productSelectors.link];
+            
+            let linkElement = null;
+            for (const linkSelector of linkSelectors) {
+                linkElement = container.querySelector(linkSelector);
+                if (linkElement) break;
             }
             
-            const titleElement = container.querySelector(productSelectors.title);
-            const title = getText(titleElement);
+            // If still not found, try common patterns
+            if (!linkElement) {
+                linkElement = container.querySelector('a[href*="/p/"], a[href*="/dp/"], a[href*="/gp/product/"], a[href*="/product/"]');
+            }
+            if (!linkElement) {
+                linkElement = container.querySelector('h2 a, h3 a, a');
+            }
+            
+            // Get title
+            const titleSelectors = Array.isArray(productSelectors.title) 
+                ? productSelectors.title 
+                : [productSelectors.title];
+            
+            let titleElement = null;
+            for (const titleSelector of titleSelectors) {
+                titleElement = container.querySelector(titleSelector);
+                if (titleElement) break;
+            }
+            
+            const title = getText(titleElement) || (linkElement ? getText(linkElement) : '');
+            
+            // Get price
+            const priceSelectors = Array.isArray(productSelectors.price) 
+                ? productSelectors.price 
+                : [productSelectors.price];
+            
+            let priceElement = null;
+            for (const priceSelector of priceSelectors) {
+                priceElement = container.querySelector(priceSelector);
+                if (priceElement) break;
+            }
+            
+            // Get image
+            const imageSelectors = Array.isArray(productSelectors.image) 
+                ? productSelectors.image 
+                : [productSelectors.image];
+            
+            let imageElement = null;
+            for (const imageSelector of imageSelectors) {
+                imageElement = container.querySelector(imageSelector);
+                if (imageElement) break;
+            }
             
             const product = {
                 index,
                 title: title,
-                price: getText(container.querySelector(productSelectors.price)),
+                price: getText(priceElement),
                 link: linkElement?.href || linkElement?.getAttribute('href') || '',
-                image: container.querySelector(productSelectors.image)?.src || '',
+                image: imageElement?.src || imageElement?.getAttribute('src') || '',
                 rating: getText(container.querySelector(productSelectors.rating)),
                 reviews: getText(container.querySelector(productSelectors.reviews)),
             };
@@ -81,12 +143,14 @@ export function extractProducts(containerSelector, productSelectors) {
             // Ensure link is absolute URL
             if (product.link && !product.link.startsWith('http')) {
                 try {
-                    // Check if window is available (should be in content script context)
                     if (typeof window !== 'undefined' && window.location) {
                         product.link = new URL(product.link, window.location.origin).href;
                     } else {
-                        // Fallback: assume current origin
-                        product.link = product.link.startsWith('/') ? `https://www.amazon.in${product.link}` : product.link;
+                        // Platform-specific fallback
+                        const origin = window.location?.origin || 'https://www.flipkart.com';
+                        product.link = product.link.startsWith('/') 
+                            ? `${origin}${product.link}` 
+                            : `${origin}/${product.link}`;
                     }
                 } catch (e) {
                     logger.warn('Failed to convert relative URL to absolute', { link: product.link, error: e.message });
@@ -100,8 +164,8 @@ export function extractProducts(containerSelector, productSelectors) {
                 logger.debug('Skipping invalid product', { 
                     hasTitle: !!product.title, 
                     hasLink: !!product.link,
-                    title: product.title,
-                    link: product.link 
+                    title: product.title?.substring(0, 50),
+                    link: product.link?.substring(0, 80)
                 });
             }
         } catch (error) {
@@ -170,15 +234,81 @@ export async function clickBuyNow(buyNowSelectors, options = {}) {
         logger.info('Clicking Buy Now');
 
         const buyNowButton = await findElement(buyNowSelectors.button, {
-            maxRetries: options.maxRetries || 3,
+            maxRetries: options.maxRetries || 5,
+            initialDelay: options.initialDelay || 1000,
         });
 
-        await scrollIntoView(buyNowButton);
-        await safeClick(buyNowButton, {
-            waitForClickable: true,
+        // Scroll into view with more options
+        await scrollIntoView(buyNowButton, {
+            behavior: 'smooth',
+            block: 'center',
+            delay: 1000
         });
 
-        logger.info('Buy Now clicked');
+        // Wait for button to be visible and enabled
+        const waitTimeout = options.waitTimeout || 10000;
+        const startTime = Date.now();
+        while (Date.now() - startTime < waitTimeout) {
+            const rect = buyNowButton.getBoundingClientRect();
+            const style = window.getComputedStyle(buyNowButton);
+            const isVisible = rect.width > 0 && rect.height > 0 && 
+                            style.display !== 'none' && 
+                            style.visibility !== 'hidden' && 
+                            style.opacity !== '0';
+            const isEnabled = !buyNowButton.disabled && 
+                            !buyNowButton.hasAttribute('aria-disabled') ||
+                            buyNowButton.getAttribute('aria-disabled') !== 'true';
+            
+            if (isVisible && isEnabled) {
+                logger.info('Buy Now button is visible and enabled');
+                break;
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 200));
+        }
+
+        // Try multiple click methods
+        let clicked = false;
+        
+        // Method 1: Direct click
+        try {
+            buyNowButton.click();
+            clicked = true;
+            logger.info('Buy Now clicked using direct click');
+        } catch (e) {
+            logger.warn('Direct click failed, trying dispatchEvent', { error: e.message });
+        }
+
+        // Method 2: Mouse event
+        if (!clicked) {
+            try {
+                buyNowButton.dispatchEvent(new MouseEvent('click', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window
+                }));
+                clicked = true;
+                logger.info('Buy Now clicked using MouseEvent');
+            } catch (e) {
+                logger.warn('MouseEvent click failed, trying safeClick', { error: e.message });
+            }
+        }
+
+        // Method 3: Use safeClick utility
+        if (!clicked) {
+            await safeClick(buyNowButton, {
+                waitForClickable: true,
+                waitTimeout: waitTimeout,
+                useDispatchEvent: true
+            });
+            clicked = true;
+            logger.info('Buy Now clicked using safeClick');
+        }
+
+        // Wait a bit to ensure click was processed
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        logger.info('Buy Now clicked successfully');
         return true;
     } catch (error) {
         logger.error('Failed to click Buy Now', error);

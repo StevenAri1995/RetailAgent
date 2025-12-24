@@ -46,7 +46,29 @@ export class ErrorHandler {
      * Handle error with appropriate recovery strategy
      */
     static async handle(error, context = {}) {
-        logger.error('Error occurred', error, context);
+        // Safely extract error message before logging to avoid DOM reference issues
+        let safeError = error;
+        try {
+            // Create a safe copy of the error without DOM references
+            if (error && typeof error === 'object') {
+                safeError = {
+                    message: String(error.message || 'Unknown error'),
+                    name: String(error.name || 'Error'),
+                    stack: String(error.stack || ''),
+                    code: error.code,
+                    recoverable: error.recoverable,
+                    context: error.context
+                };
+            }
+        } catch (e) {
+            // If we can't serialize, create a minimal error object
+            safeError = {
+                message: 'Error occurred (details unavailable)',
+                name: 'Error'
+            };
+        }
+        
+        logger.error('Error occurred', safeError, context);
 
         // Determine if error is recoverable
         if (error instanceof RetailAgentError && error.recoverable) {

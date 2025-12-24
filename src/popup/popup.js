@@ -6,19 +6,34 @@ document.addEventListener('DOMContentLoaded', () => {
   const clearChatBtn = document.getElementById('clear-chat-btn');
   const settingsModal = document.getElementById('settings-modal');
   const apiKeyInput = document.getElementById('api-key');
+  const phoneNumberInput = document.getElementById('phone-number');
   const saveSettingsBtn = document.getElementById('save-settings');
   const checkModelsBtn = document.getElementById('check-models');
   const closeSettingsBtn = document.getElementById('close-settings');
+  const loginPlatformsBtn = document.getElementById('login-platforms-btn');
 
-  // Load API Key
+  // Load settings
   if (chrome && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.get(['geminiApiKey'], (result) => {
+    chrome.storage.local.get(['geminiApiKey', 'phoneNumber', 'loggedInPlatforms'], (result) => {
       if (result.geminiApiKey) {
         apiKeyInput.value = result.geminiApiKey;
       } else {
         appendMessage('system', 'Please set your Gemini API Key in settings first.');
         settingsModal.classList.remove('hidden');
       }
+      
+      if (result.phoneNumber) {
+        phoneNumberInput.value = result.phoneNumber;
+      }
+      
+      // Load platform login status
+      const loggedInPlatforms = result.loggedInPlatforms || [];
+      ['amazon', 'flipkart', 'ebay', 'walmart'].forEach(platform => {
+        const checkbox = document.getElementById(`${platform}-login`);
+        if (checkbox) {
+          checkbox.checked = loggedInPlatforms.includes(platform);
+        }
+      });
     });
   } else {
     console.error('chrome.storage not available. Are you running as an extension?');
@@ -117,14 +132,68 @@ document.addEventListener('DOMContentLoaded', () => {
 
   saveSettingsBtn.addEventListener('click', () => {
     const key = apiKeyInput.value.trim();
+    const phone = phoneNumberInput.value.trim();
+    
+    const updates = {};
     if (key) {
-      chrome.storage.local.set({ geminiApiKey: key }, () => {
-        alert('API Key saved!');
+      updates.geminiApiKey = key;
+    }
+    if (phone) {
+      updates.phoneNumber = phone;
+    }
+    
+    if (Object.keys(updates).length > 0) {
+      chrome.storage.local.set(updates, () => {
+        alert('Settings saved!');
         settingsModal.classList.add('hidden');
-        appendMessage('system', 'API Key saved. You can now make requests.');
+        appendMessage('system', 'Settings saved successfully.');
       });
     }
   });
+
+  // Platform login button
+  loginPlatformsBtn.addEventListener('click', async () => {
+    const selectedPlatforms = [];
+    ['amazon', 'flipkart', 'ebay', 'walmart'].forEach(platform => {
+      const checkbox = document.getElementById(`${platform}-login`);
+      if (checkbox && checkbox.checked) {
+        selectedPlatforms.push(platform);
+      }
+    });
+    
+    if (selectedPlatforms.length === 0) {
+      appendMessage('system', 'Please select at least one platform to login.');
+      return;
+    }
+    
+    const phone = phoneNumberInput.value.trim();
+    if (!phone) {
+      appendMessage('system', 'Please enter your phone number first.');
+      return;
+    }
+    
+    loginPlatformsBtn.disabled = true;
+    loginPlatformsBtn.textContent = 'Logging in...';
+    
+    try {
+      appendMessage('system', `Starting login for ${selectedPlatforms.length} platform(s)...`);
+      appendMessage('system', 'Please enter OTP on each platform website when prompted.');
+      
+      await chrome.runtime.sendMessage({
+        type: 'LOGIN_PLATFORMS',
+        platforms: selectedPlatforms,
+        phoneNumber: phone
+      });
+      
+      appendMessage('system', 'Login process started. Check browser tabs and enter OTP on each platform.');
+    } catch (error) {
+      appendMessage('system', `Error: ${error.message}`);
+    } finally {
+      loginPlatformsBtn.disabled = false;
+      loginPlatformsBtn.textContent = 'Login to Selected Platforms';
+    }
+  });
+
 
   // Export logs functionality
   const exportLogsBtn = document.getElementById('export-logs-btn');
@@ -224,10 +293,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Listen for updates from background
-  chrome.runtime.onMessage.addListener((message) => {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'UPDATE_STATUS') {
       appendMessage('system', message.text);
     }
+    return false;
   });
 
   // Focus input on load
