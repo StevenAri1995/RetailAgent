@@ -1,43 +1,101 @@
 {
     "manifest_version": 3,
-    "name": "Retail Agent",
-    "version": "1.0",
-    "description": "AI-powered Amazon shopping assistant",
+    "name": "RetailAgent - AI Shopping Assistant",
+    "version": "1.0.0",
+    "description": "AI-powered multi-platform ecommerce shopping assistant. Shop smarter across Amazon, Flipkart, eBay, Walmart and more with natural language commands.",
+    "author": "RetailAgent Team",
+    "homepage_url": "https://github.com/yourusername/RetailAgent",
     "permissions": [
         "activeTab",
         "scripting",
         "storage",
-        "tabs"
+        "tabs",
+        "geolocation",
+        "sidePanel"
     ],
     "host_permissions": [
         "https://www.amazon.in/*",
-        "https://generativelanguage.googleapis.com/*"
+        "https://www.amazon.com/*",
+        "https://www.amazon.co.uk/*",
+        "https://www.amazon.de/*",
+        "https://www.amazon.fr/*",
+        "https://www.flipkart.com/*",
+        "https://www.ebay.com/*",
+        "https://www.ebay.in/*",
+        "https://www.walmart.com/*",
+        "https://generativelanguage.googleapis.com/*",
+        "https://maps.googleapis.com/*"
     ],
     "background": {
         "service_worker": "src/background/service_worker.js",
         "type": "module"
     },
     "action": {
-        "default_popup": "src/popup/index.html",
         "default_icon": {
             "16": "icons/icon16.png",
             "48": "icons/icon48.png",
             "128": "icons/icon128.png"
-        }
+        },
+        "default_title": "RetailAgent - AI Shopping Assistant"
+    },
+    "side_panel": {
+        "default_path": "src/popup/index.html"
     },
     "content_scripts": [
         {
             "matches": [
-                "https://www.amazon.in/*"
+                "https://www.amazon.in/*",
+                "https://www.amazon.com/*",
+                "https://www.amazon.co.uk/*",
+                "https://www.amazon.de/*",
+                "https://www.amazon.fr/*"
             ],
             "js": [
                 "src/content/amazon.js"
-            ]
+            ],
+            "run_at": "document_idle"
+        },
+        {
+            "matches": [
+                "https://www.flipkart.com/*"
+            ],
+            "js": [
+                "src/content/flipkart.js"
+            ],
+            "run_at": "document_idle"
+        },
+        {
+            "matches": [
+                "https://www.ebay.com/*",
+                "https://www.ebay.in/*"
+            ],
+            "js": [
+                "src/content/ebay.js"
+            ],
+            "run_at": "document_idle"
+        },
+        {
+            "matches": [
+                "https://www.walmart.com/*"
+            ],
+            "js": [
+                "src/content/walmart.js"
+            ],
+            "run_at": "document_idle"
         }
     ],
     "icons": {
         "16": "icons/icon16.png",
         "48": "icons/icon48.png",
         "128": "icons/icon128.png"
+    },
+    "web_accessible_resources": [
+        {
+            "resources": ["docs/privacy-policy.html"],
+            "matches": ["<all_urls>"]
+        }
+    ],
+    "content_security_policy": {
+        "extension_pages": "script-src 'self'; object-src 'self'"
     }
 }

@@ -1,101 +1,91 @@
+/**
+ * Amazon Content Script
+ * Handles Amazon-specific page interactions
+ */
+
+import { AmazonPlatform } from './platforms/amazon-platform.js';
+import { platformRegistry } from '../lib/ecommerce-platforms.js';
+import { logger } from '../lib/logger.js';
+
+// Register Amazon platform
+const amazonPlatform = new AmazonPlatform();
+platformRegistry.register(amazonPlatform);
+
 // Notify background that page loaded
-chrome.runtime.sendMessage({ type: 'PAGE_LOADED', url: window.location.href });
+chrome.runtime.sendMessage({ type: 'PAGE_LOADED', url: window.location.href }).catch(() => {});
 
 // Listen for commands from Background
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    // Handle async operations properly
     if (request.action === 'GET_SEARCH_RESULTS') {
-        const items = [];
-        // Robust selectors for search results
-        const resultSelectors = [
-            '[data-component-type="s-search-result"]',
-            '.s-result-item',
-            '.s-card-container',
-            '[data-cel-widget^="search_result_"]'
-        ];
-
-        let results = [];
-        for (let sel of resultSelectors) {
-            results = document.querySelectorAll(sel);
-            if (results.length > 0) break;
-        }
-
-        console.log(`[Amazon Content Script] Found ${results.length} items using selector`);
-
-        results.forEach(el => {
-            // Check if sponsored
-            const isSponsored =
-                el.querySelector('.s-sponsored-label-text') ||
-                el.innerText.includes('Sponsored') ||
-                el.classList.contains('AdHolder');
-
-            if (!isSponsored) {
-                // Title Selectors
-                const titleSelectors = ['h2 a span', 'h2 a', '[data-cy="title-recipe"] h2 span', '.a-text-normal'];
-                let titleEl = null;
-                for (let sel of titleSelectors) {
-                    titleEl = el.querySelector(sel);
-                    if (titleEl) break;
+        // Use promise to handle async operation
+        (async () => {
+            try {
+                logger.info('Content script: Getting search results...');
+                const products = await amazonPlatform.getSearchResults();
+                logger.info(`Content script: Found ${products.length} products`);
+                
+                // Ensure response is fully serializable by converting to JSON and back
+                try {
+                    const serializableProducts = JSON.parse(JSON.stringify(products));
+                    logger.info('Content script: Sending response', { itemCount: serializableProducts.length });
+                    sendResponse({ items: serializableProducts, success: true });
+                } catch (serializeError) {
+                    logger.error('Failed to serialize products', serializeError);
+                    sendResponse({ items: [], success: false, error: 'Serialization failed' });
                 }
-
-                // Link Selectors
-                const linkSelectors = ['h2 a', '.a-link-normal'];
-                let linkEl = null;
-                for (let sel of linkSelectors) {
-                    linkEl = el.querySelector(sel);
-                    if (linkEl && linkEl.href && !linkEl.href.includes('/sspa/')) break; // Avoid sponsored links
-                }
-
-                // Price Selectors
-                const priceEl = el.querySelector('.a-price .a-offscreen') || el.querySelector('.a-price');
-
-                if (titleEl && linkEl) {
-                    items.push({
-                        title: titleEl.innerText,
-                        link: linkEl.href,
-                        price: priceEl ? priceEl.innerText : 'N/A'
-                    });
-                }
+            } catch (error) {
+                logger.error('Content script: Error getting search results', error);
+                sendResponse({ items: [], success: false, error: error.message || 'Unknown error' });
             }
-        });
-
-        console.log(`[Amazon Content Script] Returning ${items.length} valid items`);
-        sendResponse({ items: items });
+        })();
+        
+        // Return true to indicate we will send response asynchronously
+        return true;
     }
+    
+    // Handle other actions
+    try {
+        if (request.action === 'CLICK_BUY_NOW') {
+            amazonPlatform.buyNow().then(success => {
+                sendResponse({ success });
+            }).catch(error => {
+                sendResponse({ success: false, error: error.message });
+            });
+            return true;
+        } else if (request.action === 'ADD_TO_CART') {
+            amazonPlatform.addToCart().then(success => {
+                sendResponse({ success });
+            }).catch(error => {
+                sendResponse({ success: false, error: error.message });
+            });
+            return true;
+        } else if (request.action === 'GET_PRODUCT_DETAILS') {
+            amazonPlatform.getProductDetails().then(details => {
+                sendResponse({ details, success: true });
+            }).catch(error => {
+                sendResponse({ success: false, error: error.message });
+            });
+            return true;
+        } else if (request.action === 'GET_ADDRESS_OPTIONS') {
+            sendResponse({ options: [], success: true });
+        } else if (request.action === 'GET_ORDER_DETAILS') {
+            const orderIdEl = document.querySelector('bdi') || document.querySelector('.my-orders-order-id');
+            const deliveryEl = document.querySelector('.delivery-box__primary-text');
 
-    if (request.action === 'CLICK_BUY_NOW') {
-        const buyNowSelectors = ['#buy-now-button', '#sc-buy-box-ptc-button', '[name="submit.buy-now"]'];
-        let buyNowBtn = null;
-
-        for (let sel of buyNowSelectors) {
-            buyNowBtn = document.querySelector(sel);
-            if (buyNowBtn) break;
-        }
-
-        if (buyNowBtn) {
-            buyNowBtn.click();
-            sendResponse({ success: true });
+            sendResponse({
+                orderId: orderIdEl ? orderIdEl.innerText : 'Pending/Unknown',
+                deliveryDate: deliveryEl ? deliveryEl.innerText : 'Unknown',
+                success: true
+            });
         } else {
-            sendResponse({ success: false, error: 'Buy Now button not found' });
+            sendResponse({ success: false, error: 'Unknown action' });
         }
+    } catch (error) {
+        logger.error('Amazon content script error', error);
+        sendResponse({ success: false, error: error.message });
     }
-
-    if (request.action === 'GET_ADDRESS_OPTIONS') {
-        // Address selection logic
-        // Usually a list of radio buttons or 'Deliver to this address' buttons
-        // This is highly variable on Amazon, simplified for demo
-        const invalid = false; // logic placeholder
-        sendResponse({ options: [] }); // simple placeholder
-    }
-
-    // Add more handlers...
-    if (request.action === 'GET_ORDER_DETAILS') {
-        // Selectors for Thank You page
-        const orderIdEl = document.querySelector('bdi') || document.querySelector('.my-orders-order-id'); // simplified
-        const deliveryEl = document.querySelector('.delivery-box__primary-text');
-
-        sendResponse({
-            orderId: orderIdEl ? orderIdEl.innerText : 'Pending/Unknown',
-            deliveryDate: deliveryEl ? deliveryEl.innerText : 'Unknown'
-        });
-    }
+    
+    // Return false for synchronous handlers
+    return false;
 });

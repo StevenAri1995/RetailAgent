@@ -1,4 +1,13 @@
+import { cache } from './cache.js';
+
 export async function generateContent(apiKey, prompt, systemInstruction = "") {
+    // Check cache first
+    const cacheKey = `gemini:${prompt}:${systemInstruction}`;
+    const cached = cache.get(cacheKey);
+    if (cached) {
+        return cached;
+    }
+
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`;
 
     // For gemini-pro (1.0), system instructions are best passed as part of the user prompt
@@ -24,6 +33,10 @@ export async function generateContent(apiKey, prompt, systemInstruction = "") {
         }
 
         const data = await response.json();
+        
+        // Cache successful responses (shorter TTL for API responses)
+        cache.set(cacheKey, data, 2 * 60 * 1000); // 2 minutes
+        
         return data;
     } catch (error) {
         console.error("Gemini Request Failed", error);
